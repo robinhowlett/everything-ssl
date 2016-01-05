@@ -1,0 +1,10 @@
+/*
+!src
+!src/*
+!src/main
+.DS_Store
+!pom.xml
+!README.md
+!.gitignore
+*.iml
+!.java-version
