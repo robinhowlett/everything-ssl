@@ -4,7 +4,7 @@ This project is a companion piece to the blog post ["Everything You Ever Wanted 
 
 It is a Java 8 Spring Boot application to demonstrate two-way SSL. It enables both HTTP and HTTPS communication (with client certificates).
 
-Unit tests use Apache's `HttpClient` and `HttpServer`:
+[Unit tests](https://github.com/robinhowlett/everything-ssl/blob/master/src/test/java/com/robinhowlett/ssl/EverythingSSLTest.java) use Apache's `HttpClient` and `HttpServer`:
 
 * `execute_WithNoScheme_ThrowsClientProtocolExceptionInvalidHostname`
 * `httpRequest_Returns200OK`
@@ -16,7 +16,7 @@ Unit tests use Apache's `HttpClient` and `HttpServer`:
 * `httpsRequest_With2WaySSLButNoClientKeyStore_ThrowsSSLExceptionBadCertificate`
 * `httpsRequest_With2WaySSLAndHasValidKeyStoreAndTrustStore_Returns200OK`
 
-Integration tests use the Spring Boot application and `TestRestTemplate`:
+[Integration tests](https://github.com/robinhowlett/everything-ssl/blob/master/src/test/java/com/robinhowlett/ssl/ITEverythingSSL.java) use the Spring Boot application and `TestRestTemplate`:
 
 * `rest_OverPlainHttp_GetsExpectedResponse`
 * `rest_WithMissingClientCert_ThrowsSSLHandshakeExceptionBadCertificate`
