@@ -1,6 +1,6 @@
 # Everything You Ever Wanted to Know About SSL (but Were Afraid to Ask)
 
-This project is a companion piece to the blog post ["Everything You Ever Wanted to Know About SSL (but Were Afraid to Ask)"](http://localhost:4000/blog/2015/12/22/everything-you-ever-wanted-to-know-about-ssl-but-were-afraid-to-ask). 
+This project is a companion piece to the blog post ["Everything You Ever Wanted to Know About SSL (but Were Afraid to Ask)"](http://www.robinhowlett.com/blog/2016/01/05/everything-you-ever-wanted-to-know-about-ssl-but-were-afraid-to-ask/). 
 
 It is a Java 8 Spring Boot application to demonstrate two-way SSL. It enables both HTTP and HTTPS communication (with client certificates).
 
