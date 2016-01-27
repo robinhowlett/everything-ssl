@@ -12,7 +12,6 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.ssl.SSLContextBuilder;
 import org.apache.http.ssl.SSLContexts;
-import org.apache.http.ssl.TrustStrategy;
 import org.hamcrest.core.IsInstanceOf;
 import org.junit.Before;
 import org.junit.Rule;
@@ -40,7 +39,6 @@ import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLHandshakeException;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
-import javax.net.ssl.X509TrustManager;
 
 import static org.hamcrest.Matchers.equalTo;
 import static org.junit.Assert.assertThat;
@@ -55,6 +53,7 @@ public class EverythingSSLTest {
 
     private static final boolean ONE_WAY_SSL = false; // no client certificates
     private static final boolean TWO_WAY_SSL = true; // client certificates mandatory
+    private static final String PROTOCOL = "TLS";
 
     private static final KeyStore NO_CLIENT_KEYSTORE = null;
     private static final SSLContext NO_SSL_CONTEXT = null;
@@ -62,26 +61,11 @@ public class EverythingSSLTest {
     private static final char[] KEYPASS_AND_STOREPASS_VALUE = "snaplogic".toCharArray();
     private static final String JAVA_KEYSTORE = "jks";
     private static final String SERVER_KEYSTORE = "ssl/server_keystore.jks";
-    private static final String SERVER_KEYSTORE_CLIENT_AND_CA_CERTS_REMOVED =
-            "ssl/server_keystore_client-ca-certs-removed.jks";
+    private static final String SERVER_TRUSTSTORE = "ssl/server_truststore.jks";
     private static final String CLIENT_KEYSTORE = "ssl/client_keystore.jks";
     private static final String CLIENT_TRUSTSTORE = "ssl/client_truststore.jks";
 
-    private final static TrustManager[] TRUST_ALL_CERTS_TRUST_MANAGER = new TrustManager[]{
-            new X509TrustManager() {
-                public java.security.cert.X509Certificate[] getAcceptedIssuers() {
-                    return null;
-                }
-
-                public void checkClientTrusted(
-                        java.security.cert.X509Certificate[] certs, String authType) {
-                }
-
-                public void checkServerTrusted(
-                        java.security.cert.X509Certificate[] certs, String authType) {
-                }
-            }
-    };
+    private static final TrustManager[] NO_SERVER_TRUST_MANAGER = null;
 
     private CloseableHttpClient httpclient;
 
@@ -144,8 +128,8 @@ public class EverythingSSLTest {
     @Test
     public void httpsRequest_With1WaySSLAndValidatingCertsButNoClientTrustStore_ThrowsSSLException()
             throws Exception {
-        SSLContext serverSSLContext =
-                createServerSSLContext(SERVER_KEYSTORE, KEYPASS_AND_STOREPASS_VALUE);
+        SSLContext serverSSLContext = createServerSSLContext(SERVER_KEYSTORE,
+                NO_SERVER_TRUST_MANAGER, KEYPASS_AND_STOREPASS_VALUE);
 
         final HttpServer server = createLocalTestServer(serverSSLContext, ONE_WAY_SSL);
         server.start();
@@ -174,18 +158,18 @@ public class EverythingSSLTest {
         This time, we tell the client to trust all certificates presented to it, so certificate
          validation is bypassed and the request succeeds
          */
-        SSLContext trustedSSLContext = new SSLContextBuilder().loadTrustMaterial(
-                NO_CLIENT_KEYSTORE, new TrustStrategy() {
-                    public boolean isTrusted(X509Certificate[] arg0, String arg1) throws
-                            CertificateException {
-                        return true;
-                    }
-                }).build();
+        SSLContext trustedSSLContext =
+                new SSLContextBuilder().loadTrustMaterial(
+                        NO_CLIENT_KEYSTORE,
+                        (X509Certificate[] arg0, String arg1) -> {
+                            return true;
+                        }) // trust all
+                        .build();
 
         httpclient = HttpClients.custom().setSSLContext(trustedSSLContext).build();
 
         SSLContext serverSSLContext = createServerSSLContext(SERVER_KEYSTORE,
-                KEYPASS_AND_STOREPASS_VALUE);
+                NO_SERVER_TRUST_MANAGER, KEYPASS_AND_STOREPASS_VALUE);
 
         final HttpServer server = createLocalTestServer(serverSSLContext, ONE_WAY_SSL);
         server.start();
@@ -205,8 +189,8 @@ public class EverythingSSLTest {
     @Test
     public void httpsRequest_With1WaySSLAndValidatingCertsAndClientTrustStore_Returns200OK()
             throws Exception {
-        SSLContext serverSSLContext =
-                createServerSSLContext(SERVER_KEYSTORE, KEYPASS_AND_STOREPASS_VALUE);
+        SSLContext serverSSLContext = createServerSSLContext(SERVER_KEYSTORE,
+                NO_SERVER_TRUST_MANAGER, KEYPASS_AND_STOREPASS_VALUE);
 
         final HttpServer server = createLocalTestServer(serverSSLContext, ONE_WAY_SSL);
         server.start();
@@ -240,14 +224,13 @@ public class EverythingSSLTest {
     @Test
     public void httpsRequest_With2WaySSLAndUnknownClientCert_ThrowsSSLExceptionBadCertificate()
             throws Exception {
-        SSLContext serverSSLContext = createServerSSLContext(
-                SERVER_KEYSTORE_CLIENT_AND_CA_CERTS_REMOVED, KEYPASS_AND_STOREPASS_VALUE);
+        SSLContext serverSSLContext = createServerSSLContext(SERVER_KEYSTORE,
+                NO_SERVER_TRUST_MANAGER, KEYPASS_AND_STOREPASS_VALUE);
 
         /*
-        Set up a LocalTestServer that requires client certificates. The server's KeyStore does
-        not contain either the client's certificate or the CA certificate that signed it, meaning
-        the server will not be able to validate the client's certificate. The SSL handshake will
-        fail.
+        Set up a LocalTestServer that requires client certificates. The server's TrustStore does
+        not contain the CA certificate that signed the client's certificate, meaning the server
+        will not be able to validate the client's certificate. The SSL handshake will fail.
          */
         final HttpServer server = createLocalTestServer(serverSSLContext, TWO_WAY_SSL);
         server.start();
@@ -278,8 +261,12 @@ public class EverythingSSLTest {
     @Test
     public void httpsRequest_With2WaySSLButNoClientKeyStore_ThrowsSSLExceptionBadCertificate()
             throws Exception {
-        SSLContext serverSSLContext =
-                createServerSSLContext(SERVER_KEYSTORE, KEYPASS_AND_STOREPASS_VALUE);
+        // load the server's truststore file into a KeyStore and create a TrustManager array from it
+        KeyStore serverTrustStore = getStore(SERVER_TRUSTSTORE, KEYPASS_AND_STOREPASS_VALUE);
+        TrustManager[] serverTrustManagers = getTrustManagers(serverTrustStore);
+
+        SSLContext serverSSLContext = createServerSSLContext(SERVER_KEYSTORE,
+                serverTrustManagers, KEYPASS_AND_STOREPASS_VALUE);
 
         final HttpServer server = createLocalTestServer(serverSSLContext, TWO_WAY_SSL);
         server.start();
@@ -313,8 +300,11 @@ public class EverythingSSLTest {
     @Test
     public void httpsRequest_With2WaySSLAndHasValidKeyStoreAndTrustStore_Returns200OK()
             throws Exception {
-        SSLContext serverSSLContext =
-                createServerSSLContext(SERVER_KEYSTORE, KEYPASS_AND_STOREPASS_VALUE);
+        KeyStore serverTrustStore = getStore(SERVER_TRUSTSTORE, KEYPASS_AND_STOREPASS_VALUE);
+        TrustManager[] serverTrustManagers = getTrustManagers(serverTrustStore);
+
+        SSLContext serverSSLContext = createServerSSLContext(SERVER_KEYSTORE,
+                serverTrustManagers, KEYPASS_AND_STOREPASS_VALUE);
 
         final HttpServer server = createLocalTestServer(serverSSLContext, TWO_WAY_SSL);
         server.start();
@@ -363,14 +353,14 @@ public class EverythingSSLTest {
     Create an SSLContext for the server using the server's JKS. This instructs the server to
     present its certificate when clients connect over HTTPS.
      */
-    protected SSLContext createServerSSLContext(final String storeFileName, final char[]
-            password) throws CertificateException, NoSuchAlgorithmException, KeyStoreException,
-            IOException, UnrecoverableKeyException, KeyManagementException {
-        KeyStore serverKeyStore = getStore(storeFileName, password);
+    protected SSLContext createServerSSLContext(final String keyStoreFileName,
+            TrustManager[] serverTrustManagers, final char[] password) throws CertificateException,
+            NoSuchAlgorithmException, KeyStoreException, IOException, UnrecoverableKeyException,
+            KeyManagementException {
+        KeyStore serverKeyStore = getStore(keyStoreFileName, password);
         KeyManager[] serverKeyManagers = getKeyManagers(serverKeyStore, password);
-        TrustManager[] serverTrustManagers = getTrustManagers(serverKeyStore);
 
-        SSLContext sslContext = SSLContexts.custom().useProtocol("TLS").build();
+        SSLContext sslContext = SSLContexts.custom().useProtocol(PROTOCOL).build();
         sslContext.init(serverKeyManagers, serverTrustManagers, new SecureRandom());
 
         return sslContext;
