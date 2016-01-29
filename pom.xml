@@ -28,7 +28,8 @@
     </properties>
 
     <scm>
-        <connection>scm:git:ssh://github.com/robinhowlett/everything-ssl.git</connection>
+        <connection>scm:git:git@github.com:robinhowlett/everything-ssl.git</connection>
+        <developerConnection>scm:git:git@github.com:robinhowlett/everything-ssl.git</developerConnection>
     </scm>
 
     <dependencies>
