@@ -22,3 +22,5 @@ It is a Java 8 Spring Boot application to demonstrate two-way SSL. It enables bo
 * `rest_WithMissingClientCert_ThrowsSSLHandshakeExceptionBadCertificate`
 * `rest_WithUntrustedServerCert_ThrowsSSLHandshakeExceptionUnableFindValidCertPath`
 * `rest_WithTwoWaySSL_AuthenticatesAndGetsExpectedResponse`
+
+test
